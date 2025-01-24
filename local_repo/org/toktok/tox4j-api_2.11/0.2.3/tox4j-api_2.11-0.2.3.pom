@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.toktok</groupId>
+    <artifactId>tox4j-api_2.11</artifactId>
+    <packaging>jar</packaging>
+    <description>tox4j-api</description>
+    <version>0.2.3</version>
+    <licenses>
+        <license>
+            <name>GPL-3.0</name>
+            <url>https://opensource.org/licenses/GPL-3.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>tox4j-api</name>
+    <organization>
+        <name>org.toktok</name>
+    </organization>
+    <dependencies>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.11.12</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>13.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_2.11</artifactId>
+            <version>1.14.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-14_2.11</artifactId>
+            <version>3.1.0.1</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

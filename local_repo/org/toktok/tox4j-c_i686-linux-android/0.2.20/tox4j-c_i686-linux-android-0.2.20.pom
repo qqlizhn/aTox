@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.toktok</groupId>
+    <artifactId>tox4j-c_i686-linux-android</artifactId>
+    <packaging>jar</packaging>
+    <description>tox4j-c_i686-linux-android</description>
+    <version>0.2.20</version>
+    <licenses>
+        <license>
+            <name>AGPL-V3</name>
+            <url>http://opensource.org/licenses/AGPL-V3</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <name>tox4j-c_i686-linux-android</name>
+    <organization>
+        <name>org.toktok</name>
+    </organization>
+</project>
