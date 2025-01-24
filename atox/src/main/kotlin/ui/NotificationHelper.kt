@@ -6,6 +6,7 @@
 package ltd.evilcorp.atox.ui
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -256,15 +257,15 @@ class NotificationHelper @Inject constructor(private val context: Context) {
 
     fun dismissCallNotification(pk: PublicKey) = notifier.cancel(pk.string().hashCode() + CALL.hashCode())
 
-    fun showOngoingCallNotification(contact: Contact) {
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            Log.w(TAG, "Call ongoing, notifications disallowed")
-            return
-        }
+    fun showOngoingCallNotification(contact: Contact): Notification? {
+//        if (ActivityCompat.checkSelfPermission(
+//                context,
+//                Manifest.permission.POST_NOTIFICATIONS,
+//            ) != PackageManager.PERMISSION_GRANTED
+//        ) {
+//            Log.w(TAG, "Call ongoing, notifications disallowed")
+//            return null;
+//        }
 
         dismissCallNotification(PublicKey(contact.publicKey))
         val notificationBuilder = NotificationCompat.Builder(context, CALL)
@@ -304,8 +305,9 @@ class NotificationHelper @Inject constructor(private val context: Context) {
             )
             .setOngoing(true)
             .setSilent(true)
-
-        notifier.notify(contact.publicKey.hashCode() + CALL.hashCode(), notificationBuilder.build())
+        var notification = notificationBuilder.build();
+        notifier.notify(contact.publicKey.hashCode() + CALL.hashCode(), notification)
+        return notification;
     }
 
     fun showPendingCallNotification(status: UserStatus, c: Contact) {

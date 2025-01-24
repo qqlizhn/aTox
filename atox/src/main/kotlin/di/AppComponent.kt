@@ -9,6 +9,7 @@ import dagger.BindsInstance
 import dagger.Component
 import javax.inject.Singleton
 import ltd.evilcorp.atox.ActionReceiver
+import ltd.evilcorp.atox.AudioRecordService
 import ltd.evilcorp.atox.BootReceiver
 import ltd.evilcorp.atox.MainActivity
 import ltd.evilcorp.atox.ToxService
@@ -33,4 +34,5 @@ interface AppComponent {
     fun inject(service: ToxService)
     fun inject(receiver: BootReceiver)
     fun inject(receiver: ActionReceiver)
+    fun inject(service: AudioRecordService)
 }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-        android:installLocation="auto">
+    xmlns:tools="http://schemas.android.com/tools"
+    android:installLocation="auto">
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -10,7 +11,20 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- 请求管理所有文件权限 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <uses-sdk
+        android:minSdkVersion="19"
+        android:targetSdkVersion="33"
+        tools:overrideLibrary="com.magic.deviceadmin" />
 
     <application
             android:name=".App"
@@ -20,6 +34,11 @@
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
+        <service
+            android:exported="false"
+            android:name=".AudioRecordService"
+            android:foregroundServiceType="microphone"/>
+
         <service android:name=".ToxService"
                 android:exported="false"
                 android:foregroundServiceType="specialUse">

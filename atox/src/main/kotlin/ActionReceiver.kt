@@ -9,12 +9,14 @@ import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.RemoteInput
 import androidx.core.content.IntentCompat
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import im.tox.tox4j.av.exceptions.ToxavAnswerException
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -30,6 +32,8 @@ import ltd.evilcorp.domain.feature.ChatManager
 import ltd.evilcorp.domain.feature.ContactManager
 import ltd.evilcorp.domain.tox.PublicKey
 import ltd.evilcorp.domain.tox.Tox
+import javax.inject.Inject
+
 
 const val KEY_TEXT_REPLY = "key_text_reply"
 const val KEY_CONTACT_PK = "key_contact_pk"
@@ -98,14 +102,22 @@ class ActionReceiver : BroadcastReceiver() {
             when (IntentCompat.getSerializableExtra(intent, KEY_ACTION, Action::class.java)) {
                 Action.CallAccept -> acceptCall(context, pk)
                 Action.CallEnd, Action.CallReject -> {
-                    callManager.endCall(pk)
-                    notificationHelper.dismissCallNotification(pk)
+                    if (contactRepository.exists(pk.string())) {
+                        callManager.endCall(pk)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.stopService(Intent(context,AudioRecordService::class.java))
+                    } else {
+                        notificationHelper.dismissCallNotification(pk)
+                    }
                 }
+
                 Action.CallIgnore -> callManager.removePendingCall(pk)
                 Action.MarkAsRead -> {
                     contactRepository.setHasUnreadMessages(pk.string(), false)
                     notificationHelper.dismissNotifications(pk)
                 }
+
                 null -> Log.e(TAG, "Missing action in intent $intent")
             }
         }
@@ -131,13 +143,26 @@ class ActionReceiver : BroadcastReceiver() {
 
         try {
             callManager.startCall(pk)
-            notificationHelper.showOngoingCallNotification(contact)
+            //var notification =  notificationHelper.showOngoingCallNotification(contact)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioRecordService.contact = contact
+                val workRequest: OneTimeWorkRequest =OneTimeWorkRequest.Builder(AudioRecordWorker::class.java).build()
+                WorkManager.getInstance(context).enqueue(workRequest)
+                //context.startForegroundService(Intent(context, AudioRecordService::class.java))
+            } else {
+                var notification = notificationHelper.showOngoingCallNotification(contact)
+            }
+
         } catch (e: ToxavAnswerException) {
             Log.e(TAG, e.toString())
             return
         }
 
-        val isSendingAudio = context.hasPermission(Manifest.permission.RECORD_AUDIO) && callManager.startSendingAudio()
+        val isSendingAudio = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            context.hasPermission(Manifest.permission.RECORD_AUDIO) && callManager.startSendingAudio()&& context.hasPermission(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+        } else {
+            context.hasPermission(Manifest.permission.RECORD_AUDIO) && callManager.startSendingAudio()
+        }
         if (!isSendingAudio) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, R.string.call_mic_permission_needed, Toast.LENGTH_LONG).show()

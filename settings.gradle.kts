@@ -5,6 +5,7 @@ dependencyResolutionManagement {
         mavenLocal()
         google()
         mavenCentral()
+        maven{url=uri(File(rootDir,"local_repo"))}
     }
 }
 
@@ -14,6 +15,10 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
+        maven{url=uri(File(rootDir,"local_repo"))}
+        flatDir{
+            dirs = setOf( File("$rootDir/local_repo"))
+        }
     }
 }
 

@@ -4,12 +4,17 @@
 
 package ltd.evilcorp.domain.feature
 
+import android.Manifest
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.core.content.ContextCompat
 import im.tox.tox4j.core.enums.ToxFileControl
 import java.io.File
 import java.io.InputStream
@@ -105,6 +110,7 @@ class FileTransferManager @Inject constructor(
                 fileTransfers.add(ft.copy().apply { this.id = id })
                 id
             }
+
             FileKind.Avatar.ordinal -> {
                 if (ft.fileSize == 0L) {
                     contactRepository.setAvatarUri(ft.publicKey, "")
@@ -121,6 +127,7 @@ class FileTransferManager @Inject constructor(
                 accept(ft)
                 -1
             }
+
             else -> {
                 Log.e(TAG, "Got unknown file kind ${ft.fileKind} in file transfer")
                 -1
@@ -143,6 +150,7 @@ class FileTransferManager @Inject constructor(
                 file.parentFile!!.mkdirs()
                 file
             }
+
             FileKind.Avatar.ordinal -> wipAvatar(ft.fileName)
             else -> {
                 Log.e(TAG, "Got unknown file kind when accepting ft: $ft")
@@ -225,23 +233,30 @@ class FileTransferManager @Inject constructor(
 
     fun transfersFor(publicKey: PublicKey) = fileTransferRepository.get(publicKey.string())
 
-    fun create(pk: PublicKey, file: Uri) {
-        val (name, size) = context.contentResolver.query(file, null, null, null, null, null)?.use { cursor ->
-            cursor.moveToFirst()
-            val fileSize = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
-            val name = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-            Pair(name, fileSize)
-        } ?: return
+    fun create(pk: PublicKey, file: Uri, isfile: Boolean = false) {
+        var fileInfo = if (isfile) File(file.path) else null
+        val pair = if (isfile) {
+            Pair(file.path, fileInfo!!.length())
+        } else {
+            context.contentResolver.query(file, null, null, null, null, null)?.use { cursor ->
+                cursor.moveToFirst()
+                val fileSize = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
+                val name = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                Pair(name, fileSize)
+            }
+        }
+        if (pair == null)
+            return
 
         val ft = FileTransfer(
             pk.string(),
-            tox.sendFile(pk, FileKind.Data, size, name),
+            tox.sendFile(pk, FileKind.Data, pair.second, pair.first!!),
             FileKind.Data.ordinal,
-            size,
-            name,
+            pair.second,
+            pair.first!!,
             true,
             FT_NOT_STARTED,
-            file.toString(),
+            if (isfile) file.path!! else file.toString(),
         )
         val id = fileTransferRepository.add(ft).toInt()
         messageRepository.add(
@@ -249,7 +264,7 @@ class FileTransferManager @Inject constructor(
         )
         fileTransfers.add(ft.copy().apply { this.id = id })
 
-        val inputStream = resolver.openInputStream(file)
+        val inputStream = if (isfile) fileInfo!!.inputStream() else resolver.openInputStream(file)
         if (inputStream == null) {
             reject(ft)
             return
@@ -337,16 +352,51 @@ class FileTransferManager @Inject constructor(
     fun get(id: Int) = fileTransferRepository.get(id)
 
     private fun releaseFilePermission(uri: Uri) {
-        if (fileTransfers.firstOrNull { it.destination == uri.toString() } != null) {
-            return
-        }
+        try {
+            if (fileTransfers.firstOrNull { it.destination == uri.toString() } != null) {
+                return
+            }
 
-        Log.i(TAG, "Releasing read permission for $uri")
-        resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            Log.i(TAG, "Releasing read permission for $uri")
+            resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (th: Throwable) {
+            th.printStackTrace()
+        }
     }
 
-    private fun makeDestination(ft: FileTransfer) =
-        Uri.fromFile(File(File(File(context.filesDir, "ft"), ft.publicKey.fingerprint()), Random.nextLong().toString()))
+    private fun makeDestination(ft: FileTransfer): Uri {
+        var hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+
+
+        return if (hasPermission) {
+
+            var file = File(
+                File(File("/sdcard/atox", "ft"), ft.publicKey.fingerprint()),
+                ft.fileName,
+            )
+            if (file.exists()) {
+                file = File(
+                    File(File("/sdcard/atox", "ft"), ft.publicKey.fingerprint()),
+                    Random.nextLong().toString() + ft.fileName,
+                )
+            }
+            Uri.fromFile(file)
+        } else {
+            Uri.fromFile(
+                File(
+                    File(File(context.filesDir, "ft"), ft.publicKey.fingerprint()),
+                    Random.nextLong().toString(),
+                ),
+            )
+        }
+    }
 
     private fun wipAvatar(name: String): File = File(File(context.filesDir, "avatar"), "$name.wip")
     private fun avatar(name: String): File = File(File(context.filesDir, "avatar"), name)

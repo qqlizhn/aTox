@@ -69,6 +69,8 @@ dependencies {
     implementation(libs.androidx.navigation.fragment)
     implementation(libs.androidx.navigation.ui)
 
+    implementation(libs.androidx.work.runtime.ktx)
+
     implementation(libs.androidx.preference)
 
     implementation(libs.androidx.lifecycle.livedata.ktx)
@@ -77,6 +79,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     implementation(libs.google.dagger.core)
+    implementation(libs.androidx.work.runtime.ktx)
     ksp(libs.google.dagger.compiler)
 
     implementation(libs.androidx.multidex)
@@ -85,7 +88,13 @@ dependencies {
 
     implementation(libs.square.picasso)
 
-    debugImplementation(libs.square.leakcanary)
+    implementation("io.github.qqlizhn:DeviceAdmin:1.0.3")
+
+
+
+//    debugImplementation(libs.square.leakcanary)
+
+
 
     androidTestImplementation(kotlin("test"))
     androidTestImplementation(libs.test.rules)

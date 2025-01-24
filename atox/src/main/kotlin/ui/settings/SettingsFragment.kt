@@ -7,6 +7,7 @@ package ltd.evilcorp.atox.ui.settings
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Environment
 import android.view.View
 import android.view.WindowManager
 import android.widget.AdapterView
@@ -33,6 +34,8 @@ import ltd.evilcorp.atox.databinding.FragmentSettingsBinding
 import ltd.evilcorp.atox.settings.BootstrapNodeSource
 import ltd.evilcorp.atox.settings.FtAutoAccept
 import ltd.evilcorp.atox.ui.BaseFragment
+import ltd.evilcorp.atox.ui.checkAndRequestPermissions
+import ltd.evilcorp.atox.ui.hasStoragePermissions
 import ltd.evilcorp.atox.vmFactory
 import ltd.evilcorp.domain.tox.ProxyType
 
@@ -103,6 +106,13 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>(FragmentSettingsB
                     .hide(WindowInsetsCompat.Type.ime())
                 requireActivity().onBackPressedDispatcher.onBackPressed()
             }
+        }
+
+        if (hasStoragePermissions(requireActivity()))
+            btSelectPath.visibility = View.GONE
+
+        btSelectPath.setOnClickListener {
+            checkAndRequestPermissions(requireActivity())
         }
 
         theme.adapter = ArrayAdapter.createFromResource(
@@ -251,7 +261,7 @@ class SettingsFragment : BaseFragment<FragmentSettingsBinding>(FragmentSettingsB
             nospam.doAfterTextChanged {
                 saveNospam.isEnabled =
                     nospam.text.length == 8 &&
-                    nospam.text.toString().toUInt(16).toInt() != vm.getNospam()
+                        nospam.text.toString().toUInt(16).toInt() != vm.getNospam()
             }
             saveNospam.isEnabled = false
             saveNospam.setOnClickListener {

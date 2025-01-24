@@ -5,6 +5,7 @@
 package ltd.evilcorp.atox.ui.call
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -33,6 +34,12 @@ class CallFragment : BaseFragment<FragmentCallBinding>(FragmentCallBinding::infl
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (!requireContext().hasPermission(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)) {
+                Toast.makeText(requireContext(), getString(R.string.call_mic_permission_needed), Toast.LENGTH_LONG).show()
+                return@registerForActivityResult
+            }
+        }
         if (granted) {
             vm.startSendingAudio()
         } else {
@@ -70,7 +77,16 @@ class CallFragment : BaseFragment<FragmentCallBinding>(FragmentCallBinding::infl
                 vm.stopSendingAudio()
             } else {
                 if (requireContext().hasPermission(PERMISSION)) {
-                    vm.startSendingAudio()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        if (requireContext().hasPermission(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)) {
+                            vm.startSendingAudio()
+                        } else {
+                            requestPermissionLauncher.launch(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+                        }
+                    }else
+                    {
+                        vm.startSendingAudio()
+                    }
                 } else {
                     requestPermissionLauncher.launch(PERMISSION)
                 }
@@ -98,7 +114,13 @@ class CallFragment : BaseFragment<FragmentCallBinding>(FragmentCallBinding::infl
 
         startCall()
 
-        if (requireContext().hasPermission(PERMISSION)) {
+        var hasPermission = requireContext().hasPermission(PERMISSION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            hasPermission =
+                hasPermission && requireContext().hasPermission(Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+
+
+        if (hasPermission) {
             vm.startSendingAudio()
         }
     }

@@ -73,6 +73,17 @@ class CallManager @Inject constructor(private val tox: Tox, private val scope: C
         }
         _inCall.value = CallState.InCall(publicKey, SystemClock.elapsedRealtime())
         audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
+        if(audioManager?.isBluetoothA2dpOn() == true)
+        {
+            if (audioManager.isBluetoothScoAvailableOffCall) {
+                audioManager.startBluetoothSco();
+                audioManager.setBluetoothScoOn(true);
+                Log.d(TAG, "Audio routed to Bluetooth SCO");
+            } else {
+                Log.d(TAG, "Bluetooth SCO not available");
+            }
+        }
+
         removePendingCall(publicKey)
     }
 

@@ -5,15 +5,20 @@
 
 package ltd.evilcorp.atox.ui.chat
 
+import android.Manifest
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
+import android.util.Log
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -21,6 +26,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.content.getSystemService
@@ -34,18 +40,13 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.math.MathUtils.lerp
-import java.io.File
-import java.net.URLConnection
-import java.text.DateFormat
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import ltd.evilcorp.atox.BuildConfig
 import ltd.evilcorp.atox.R
 import ltd.evilcorp.atox.databinding.FragmentChatBinding
 import ltd.evilcorp.atox.requireStringArg
 import ltd.evilcorp.atox.truncated
 import ltd.evilcorp.atox.ui.BaseFragment
+import ltd.evilcorp.atox.ui.checkAndRequestPermissions
 import ltd.evilcorp.atox.vmFactory
 import ltd.evilcorp.core.vo.ConnectionStatus
 import ltd.evilcorp.core.vo.FileTransfer
@@ -54,6 +55,14 @@ import ltd.evilcorp.core.vo.MessageType
 import ltd.evilcorp.core.vo.isComplete
 import ltd.evilcorp.domain.feature.CallState
 import ltd.evilcorp.domain.tox.PublicKey
+import okhttp3.internal.Util
+import java.io.File
+import java.net.URLConnection
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 
 const val CONTACT_PUBLIC_KEY = "publicKey"
 const val FOCUS_ON_MESSAGE_BOX = "focusOnMessageBox"
@@ -163,6 +172,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     )
                     true
                 }
+
                 R.id.clear_history -> {
                     AlertDialog.Builder(requireContext())
                         .setTitle(R.string.clear_history)
@@ -174,6 +184,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                         .setNegativeButton(android.R.string.cancel, null).show()
                     true
                 }
+
                 R.id.call -> {
                     if (!viewModel.callingNeedsConfirmation()) {
                         navigateToCallScreen()
@@ -188,6 +199,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                         .show()
                     true
                 }
+
                 else -> super.onOptionsItemSelected(item)
             }
         }
@@ -235,14 +247,17 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     toolbar.menu.findItem(R.id.call).title = getString(R.string.call)
                     toolbar.menu.findItem(R.id.call).isEnabled = false
                 }
+
                 CallAvailability.Available -> {
                     toolbar.menu.findItem(R.id.call).title = getString(R.string.call)
                     toolbar.menu.findItem(R.id.call).isEnabled = true
                 }
+
                 CallAvailability.Active -> {
                     toolbar.menu.findItem(R.id.call).title = getString(R.string.ongoing_call)
                     toolbar.menu.findItem(R.id.call).isEnabled = true
                 }
+
                 null -> {}
             }
         }
@@ -323,6 +338,8 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
 
         attach.setOnClickListener {
             WindowInsetsControllerCompat(requireActivity().window, view).hide(WindowInsetsCompat.Type.ime())
+            if (!checkAndRequestPermissions(requireActivity()))
+                return@setOnClickListener
             attachFilesLauncher.launch(arrayOf("*/*"))
         }
 
@@ -337,6 +354,8 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
             outgoingMessage.requestFocus()
         }
     }
+
+
 
     override fun onPause() {
         viewModel.setDraft(binding.outgoingMessage.text.toString())
@@ -363,6 +382,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                         R.menu.chat_message_context_menu,
                         menu,
                     )
+
                     MessageType.FileTransfer -> {
                         inflater.inflate(R.menu.ft_message_context_menu, menu)
                         val ft = fts.find { it.id == message.correlationId } ?: return
@@ -372,6 +392,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     }
                 }
             }
+
             R.id.send -> requireActivity().menuInflater.inflate(R.menu.chat_send_long_press_menu, menu)
         }
     }
@@ -387,6 +408,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 Toast.makeText(requireContext(), getText(R.string.copied), Toast.LENGTH_SHORT).show()
                 true
             }
+
             R.id.delete -> {
                 val info = item.menuInfo as AdapterView.AdapterContextMenuInfo
                 val message = messages.adapter.getItem(info.position) as Message
@@ -405,10 +427,12 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                     .setNegativeButton(android.R.string.cancel, null).show()
                 true
             }
+
             R.id.send_action -> {
                 send(MessageType.Action)
                 true
             }
+
             R.id.export -> {
                 val info = item.menuInfo as AdapterView.AdapterContextMenuInfo
                 val message = messages.adapter.getItem(info.position) as Message
@@ -416,6 +440,7 @@ class ChatFragment : BaseFragment<FragmentChatBinding>(FragmentChatBinding::infl
                 exportFtLauncher.launch(message.message)
                 true
             }
+
             else -> super.onContextItemSelected(item)
         }
     }
